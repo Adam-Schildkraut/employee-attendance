@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "200333986882",
+    "firebase_url": "https://employee-attendance-71809.firebaseio.com",
+    "project_id": "employee-attendance-71809",
+    "storage_bucket": "employee-attendance-71809.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:200333986882:android:a70881a80f02e9c76db1db",
+        "android_client_info": {
+          "package_name": "com.eclipsestudios.employee_attendance"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "200333986882-c49oiieff43qkt28mooe1d4u9cmo5bfo.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBkWWvkMGHk9LofuUZ1rakx7or2i6hWkPg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "200333986882-c49oiieff43qkt28mooe1d4u9cmo5bfo.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "200333986882-6dkhcja8pjerikkkpuh8h2oseojim02b.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.eclipsestudios.employee_attendance"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

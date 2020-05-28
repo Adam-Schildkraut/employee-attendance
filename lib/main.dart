@@ -1,9 +1,18 @@
 import 'package:flutter/material.dart';
 import 'LoginScreen.dart';
 
-void main() => runApp(
-  MaterialApp(
-    debugShowCheckedModeBanner: false,
-    home: LoginScreen()
-  )
-);
+import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:firebase_analytics/observer.dart';
+
+void main() {
+  FirebaseAnalytics analytics = FirebaseAnalytics();
+  runApp(
+    MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: LoginScreen(),
+      navigatorObservers: [
+        FirebaseAnalyticsObserver(analytics: analytics),
+      ],
+    )
+  );
+}
