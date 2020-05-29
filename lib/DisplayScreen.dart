@@ -24,7 +24,7 @@ class _DisplayState extends State<DisplayScreen> with TickerProviderStateMixin{
   _DisplayState({@required this.businessValue, @required this.employeeNumber});
 
   String _logoURL;
-
+  String _employeeSeatLocation;
   List<String> _employeeName;
   List _date;
 
@@ -99,6 +99,7 @@ class _DisplayState extends State<DisplayScreen> with TickerProviderStateMixin{
           if (documents.documents[i].documentID == employeeNumber) {
             setState(() {
             _isEmployeeAttendingToday = true;
+            _employeeSeatLocation = documents.documents[i].data["seat"];
           });
           return;
           }
@@ -131,6 +132,7 @@ class _DisplayState extends State<DisplayScreen> with TickerProviderStateMixin{
 
   @override
   Widget build(BuildContext context) {
+    double width = MediaQuery.of(context).size.width;
     return Scaffold(
       body: Stack(
         children: <Widget>[
@@ -139,6 +141,7 @@ class _DisplayState extends State<DisplayScreen> with TickerProviderStateMixin{
           //Foreground
           Column(
             children: <Widget>[
+              //Header Info Widget
               Container(
                 height: 200,
                 width: MediaQuery.of(context).size.width,
@@ -162,105 +165,242 @@ class _DisplayState extends State<DisplayScreen> with TickerProviderStateMixin{
                     Container(
                       height: 200,
                       width: MediaQuery.of(context).size.width,
-                      child: Row(
+                      child: Stack(
                         children: <Widget>[
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: <Widget>[
-                              Container(
-                                margin: EdgeInsets.only(top: 70, left: 20),
-                                child: Text(
-                                  Jiffy(_date).format("EEEE, do MMMM").toUpperCase(),
-                                  style: TextStyle(
-                                    color: Colors.grey[500],
-                                    fontFamily: "Futura",
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 15
-                                  ),
-                                ),
+                          Container(
+                            alignment: Alignment(-0.85, -0.3),
+                            width: width,
+                            child: Text(
+                              Jiffy(_date).format("EEEE, do MMMM").toUpperCase(),
+                              style: TextStyle(
+                                color: Colors.grey[500],
+                                fontFamily: "Futura",
+                                fontWeight: FontWeight.w600,
+                                fontSize: 15
                               ),
-                              Container(
-                                margin: EdgeInsets.only(top: 5, left: 20),
-                                child: Row(
-                                  children: <Widget> [
-                                    Container(
-                                      child: Text(
-                                        "Good ${(DateTime.now().hour >= 12) ? "Afternoon" : "Morning"},",
-                                        style: TextStyle(
-                                          color: Colors.grey[600],
-                                          fontFamily: "Futura",
-                                          fontWeight: FontWeight.w900,
-                                          fontSize: 17
-                                        ),
-                                      ),
-                                    ),
-                                    Container(
-                                      margin: EdgeInsets.only(left: 5),
-                                      child: (_employeeName != null) ? Text(
-                                        "${_employeeName[0]} ${_employeeName[1]}!",
-                                        style: TextStyle(
-                                          color: Colors.grey[700],
-                                          fontFamily: "Futura",
-                                          fontWeight: FontWeight.w900,
-                                          fontSize: 17
-                                        ),
-                                      ) : Container(),
-                                    ),
-                                  ]
-                                ),
-                              ),
-                              Container(
-                                margin: EdgeInsets.only(top: 20, left: 20),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: <Widget>[
-                                    Container(
-                                      child: Text(
-                                        "You Are: ",
-                                        style: TextStyle(
-                                          color: Colors.grey[800],
-                                          fontFamily: "FuturaBold",
-                                          fontSize: 20,
-                                          height: 1.1,
-                                        )
-                                      ),
-                                    ),
-                                    Container(
-                                      padding: EdgeInsets.only(top: 10, left: 60),
-                                      child: (_isEmployeeAttendingToday != null) ? Text(
-                                          "${(_isEmployeeAttendingToday) ? "" : "Not "} Going Into The Office Today.",
-                                          style: TextStyle(
-                                            color: (_isEmployeeAttendingToday) ? Color.fromRGBO(255, 114, 140, 1) : Color.fromRGBO(247, 185, 123, 1),
-                                            fontFamily: "Futura",
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 15
-                                        ),
-                                      ) : Container(),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ]
+                            ),
                           ),
                           Container(
-                            width: 75,
-                            height: 75,
-                            decoration: BoxDecoration(
-                              color: Colors.grey[800],
-                              shape: BoxShape.circle,
-                            ),
-                            child: Center(
-                              child: Icon(
-                                Icons.person,
-                                color: Colors.white,
-                                size: 50,
+                            alignment: Alignment(-0.87, -0.05),
+                            width: width,
+                            child: Container(
+                              child: Text(
+                                "Good ${(DateTime.now().hour >= 12) ? "Afternoon" : "Morning"},",
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontFamily: "Futura",
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 17
+                                ),
                               ),
                             ),
                           ),
-                        ],
+                          Container(
+                            alignment: Alignment(0.18, -0.05),
+                            width: width,
+                            child: (_employeeName != null) ? Text(
+                              "${_employeeName[0]} ${_employeeName[1]} !",
+                              style: TextStyle(
+                                color: Colors.grey[700],
+                                fontFamily: "Futura",
+                                fontWeight: FontWeight.w900,
+                                fontSize: 17
+                              ),
+                            ) : Container(),
+                          ),
+                          Container(
+                            alignment: Alignment(-0.87, 0.45),
+                            width: width,
+                            child: Text(
+                              "You Are: ",
+                              style: TextStyle(
+                                color: Colors.grey[800],
+                                fontFamily: "FuturaBold",
+                                fontSize: 17,
+                                height: 1.1,
+                              )
+                            ),
+                          ),
+                          Container(
+                            alignment: (_isEmployeeAttendingToday) ? Alignment(0.25, 0.48) : Alignment(0.1, 0.75),
+                            width: width,
+                            child: (_isEmployeeAttendingToday != null) ? Text(
+                              "${(_isEmployeeAttendingToday) ? "" : "Not "} Going Into The Office Today.",
+                              style: TextStyle(
+                                color: (_isEmployeeAttendingToday) ? Color.fromRGBO(247, 185, 123, 1) : Color.fromRGBO(255, 114, 140, 1),
+                                fontFamily: "Futura",
+                                fontWeight: FontWeight.w700,
+                                fontSize: 17,
+                              ),
+                            ) : Container(),
+                          ),
+                          Container(
+                            alignment: Alignment(-0.68, 0.8),
+                            width: width,
+                            child: (_isEmployeeAttendingToday == true) ? Text(
+                              "Seat: ",
+                              style: TextStyle(
+                                color: Colors.grey[800],
+                                fontFamily: "FuturaBold",
+                                fontSize: 17,
+                                height: 1.1,
+                              )
+                            ) : Container(),
+                          ),
+                          Container(
+                            alignment: Alignment(-0.42, 0.81),
+                            width: width,
+                            child: (_isEmployeeAttendingToday == true) ? Text(
+                              "$_employeeSeatLocation",
+                              style: TextStyle(
+                                color: (_isEmployeeAttendingToday) ? Color.fromRGBO(247, 185, 123, 1) : Color.fromRGBO(255, 114, 140, 1),
+                                fontFamily: "Futura",
+                                fontWeight: FontWeight.w700,
+                                fontSize: 17
+                              ),
+                            ) : Container(),
+                          ),
+                          Align(
+                            alignment: Alignment(0.97, -0.12),
+                            child: Container(
+                              width: 75,
+                              height: 75,
+                              decoration: BoxDecoration(
+                                color: Colors.grey[800],
+                                shape: BoxShape.circle,
+                              ),
+                              child: Container(
+                                child: Icon(
+                                  Icons.person,
+                                  color: Colors.white,
+                                  size: 50,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ]
                       ),
                     ),
                   ],
+                ),
+              ),
+              //Attending Title Widget
+              Align(
+                alignment: Alignment(-1, 0),
+                child: Container(
+                  transform: Matrix4.translationValues(-60, 0, 0),
+                  alignment: Alignment(0, 0),
+                  width: 250,
+                  height: 50,
+                  margin: EdgeInsets.only(top: 20),
+                  padding: EdgeInsets.only(left: 50),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(50),
+                    boxShadow: [
+                      BoxShadow(
+                        blurRadius: 7,
+                        spreadRadius: 5,
+                        color: Colors.grey[400].withOpacity(0.5),
+                        offset: Offset(-5, 3)
+                      )
+                    ]
+                  ),
+                  child: Text(
+                    "You Are Attending",
+                    style: TextStyle(
+                      fontFamily: "FuturaBold",
+                      fontWeight: FontWeight.w400,
+                      fontSize: 15,
+                      color: Colors.grey[800]
+                    ),
+                  ),
+                ),
+              ),
+              //Attending Card List Widget
+              Container(
+                margin: EdgeInsets.only(top: 15),
+                height: 200,
+                width: width - 20,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                        blurRadius: 7,
+                        spreadRadius: 5,
+                        color: Colors.grey[400].withOpacity(0.5),
+                        offset: Offset(0, 3)
+                      ),
+                  ],
+                ),
+                //TODO: Attendance List Here
+                child: Container(
+                  margin: EdgeInsets.only(top: 20, bottom: 20),
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                  ),
+                  child: ListView(
+                    
+                  )
+                ),
+              ),
+              //Calendar List Widget
+              Align(
+                alignment: Alignment(1, 0),
+                child: Container(
+                  transform: Matrix4.translationValues(90, 0, 0),
+                  alignment: Alignment(0, 0),
+                  width: 250,
+                  height: 50,
+                  margin: EdgeInsets.only(top: 15),
+                  padding: EdgeInsets.only(right: 80),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(50),
+                    boxShadow: [
+                      BoxShadow(
+                        blurRadius: 7,
+                        spreadRadius: 5,
+                        color: Colors.grey[400].withOpacity(0.5),
+                        offset: Offset(5, 3)
+                      )
+                    ]
+                  ),
+                  child: Text(
+                    "Browse Dates",
+                    style: TextStyle(
+                      fontFamily: "FuturaBold",
+                      fontWeight: FontWeight.w400,
+                      fontSize: 15,
+                      color: Colors.grey[800]
+                    ),
+                  ),
+                ),
+              ),
+              //Calendar Widget
+              Container(
+                margin: EdgeInsets.only(top: 15),
+                height: 215,
+                width: width - 20,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                        blurRadius: 7,
+                        spreadRadius: 5,
+                        color: Colors.grey[400].withOpacity(0.5),
+                        offset: Offset(0, 3)
+                      )
+                  ]
+                ),
+                //TODO Calendar HERE
+                child: Container(
+                  margin: EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.blue,
+                  ),
                 ),
               ),
             ],
