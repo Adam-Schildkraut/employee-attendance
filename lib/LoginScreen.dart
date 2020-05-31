@@ -1,9 +1,10 @@
-import 'package:employee_attendance/DisplayScreen.dart';
 import 'package:flutter/material.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
+
+import 'calendar/table_calendar.dart';
 
 import 'package:jiffy/jiffy.dart';
 
@@ -15,7 +16,7 @@ class LoginScreen extends StatefulWidget {
   _LoginState createState() => _LoginState();
 }
 
-class _LoginState extends State<LoginScreen> with TickerProviderStateMixin{
+class _LoginState extends State<LoginScreen> with TickerProviderStateMixin {
 
   final FirebaseAnalytics analytics = FirebaseAnalytics();
   final db = Firestore.instance;
@@ -25,11 +26,12 @@ class _LoginState extends State<LoginScreen> with TickerProviderStateMixin{
   String _employeeNumber = "";
   String _businessName = "";
   String _logoURL;
+  String _employeeAttendingTodayLocation;
   String _employeeSeatLocation;
 
   bool _enterEmployeeNumberData = false;
   bool _onMainDataScreen = false;
-  bool _isEmployeeAttendingToday;
+  bool _isEmployeeAttendingToday = false;
 
   int _animationLength = 300;
   int _initalSlots;
@@ -40,6 +42,8 @@ class _LoginState extends State<LoginScreen> with TickerProviderStateMixin{
   var _businessValue;
 
   TextEditingController _textFieldController;
+
+  CalendarController _calendarController;
 
   AnimationController _loginWidgetTranslationController;
   Animation _loginWidgetTranslationAnimation;
@@ -71,10 +75,12 @@ class _LoginState extends State<LoginScreen> with TickerProviderStateMixin{
 
     _textFieldController = TextEditingController();
 
+    _calendarController = CalendarController();
+
     _textFieldColorController = AnimationController(vsync: this, duration: Duration(milliseconds: 150));
     _textFieldColorAnimation = ColorTween(begin: Colors.grey[600], end: Colors.red[500]).animate(_textFieldColorController);
 
-    _loginWidgetTranslationController = AnimationController(vsync: this, duration: Duration(milliseconds: 1000));
+    _loginWidgetTranslationController = AnimationController(vsync: this, duration: Duration(milliseconds: 750));
     _loginWidgetTranslationAnimation = Tween<double>(begin: 0, end: -650).animate(_loginWidgetTranslationController);
 
     _backButtonOpacityController = AnimationController(vsync: this, duration: Duration(milliseconds: _animationLength));
@@ -92,10 +98,10 @@ class _LoginState extends State<LoginScreen> with TickerProviderStateMixin{
     _employeeNumberTitleColorController = AnimationController(vsync: this, duration: Duration(milliseconds: _animationLength));
     _employeeNumberTitleColorAnimation = ColorTween(begin: Colors.grey[300], end: Colors.grey[600]).animate(_employeeNumberTitleColorController);
 
-    _companyLogoMarginController = AnimationController(vsync: this, duration: Duration(milliseconds: 1000));
+    _companyLogoMarginController = AnimationController(vsync: this, duration: Duration(milliseconds: 500));
     _companyLogoMarginAnimation = Tween<double>(begin: 0, end: 0.4).animate(_companyLogoMarginController);
 
-    _upButtonOpacityController = AnimationController(vsync: this, duration: Duration(milliseconds: _animationLength));
+    _upButtonOpacityController = AnimationController(vsync: this, duration: Duration(milliseconds: 500));
     _upButtonOpacityAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(_upButtonOpacityController);
 
     super.initState();
@@ -132,7 +138,6 @@ class _LoginState extends State<LoginScreen> with TickerProviderStateMixin{
           return;
         } else {
           //Business Exists
-          print("$value EXISTS");
           animateTitle();
           sendAnalyticsEvent("businessEvent");
           getCompanyLogo(businessID);
@@ -174,7 +179,6 @@ class _LoginState extends State<LoginScreen> with TickerProviderStateMixin{
           _businessValue = value;
 
           getDate();
-          getInitalSlots();
           getEmployeeName();
           getAttendingToday();
         } else {
@@ -195,7 +199,8 @@ class _LoginState extends State<LoginScreen> with TickerProviderStateMixin{
       await analytics.logEvent(
         name: "employee_login",
         parameters: <String, dynamic>{
-          'Employee_Number': _employeeNumber,
+          'business_id': _businessID,
+          'employee_number': _employeeNumber,
         }
       );
     }
@@ -294,14 +299,6 @@ class _LoginState extends State<LoginScreen> with TickerProviderStateMixin{
     showDialog(barrierDismissible: false, context: context, builder: (BuildContext context) => forgotInformationDialog);
   }
 
-    void getInitalSlots() async {
-    int initalSlots;
-    await _businessValue.reference.get().then((value) {initalSlots = value.data["initalSlots"];});
-    setState(() {
-      _initalSlots = initalSlots;
-    });
-  }
-
   void getDate() {
     DateTime now = new DateTime.now();
     setState(() {
@@ -309,7 +306,13 @@ class _LoginState extends State<LoginScreen> with TickerProviderStateMixin{
     });
   }
 
-    void getEmployeeName() async {
+  String getFirebaseDate(DateTime date) {
+    return "${(date.day < 10) ? "0"+date.day.toString() : date.day.toString()}"
+            + "-${(date.month < 10) ? "0"+date.month.toString() : date.month.toString()}"
+            + "-${date.year.toString()}";
+  }
+
+  void getEmployeeName() async {
     var employeeData = await _businessValue.reference.collection("employees").document(_employeeNumber).get();
     setState(() {
       _employeeName = [employeeData.data["firstName"], employeeData.data["lastName"]];
@@ -323,21 +326,25 @@ class _LoginState extends State<LoginScreen> with TickerProviderStateMixin{
     dateAsString += _date[0].toString();
     var isEmployeeAttendingToday = await _businessValue.reference.collection("days").document(dateAsString).get();
     if (isEmployeeAttendingToday.exists) {
-      isEmployeeAttendingToday.reference.collection("attending").getDocuments()
-      .then((documents) {
-        for (int i = 0; i < documents.documents.length; i++) {
-          if (documents.documents[i].documentID == _employeeNumber) {
-            setState(() {
-            _isEmployeeAttendingToday = true;
-            _employeeSeatLocation = documents.documents[i].data["seat"];
+      isEmployeeAttendingToday.reference.collection("locations").getDocuments()
+      .then((locationList) {
+        //For each location
+        for (int i = 0; i < locationList.documents.length; i++) {
+          //For each attendee in the location
+          isEmployeeAttendingToday.reference.collection("locations").document(locationList.documents[i].documentID).collection("attendees").getDocuments()
+          .then((attendeeList) {
+            for (int j = 0; j < attendeeList.documents.length; j++) {
+              if (attendeeList.documents[j].documentID == _employeeNumber) {
+                setState(() {
+                  _isEmployeeAttendingToday = true;
+                  _employeeAttendingTodayLocation = locationList.documents[i].documentID;
+                  _employeeSeatLocation = locationList.documents[i].data["seat"];
+                });
+                return;
+              }
+            }
           });
-          return;
-          }
         }
-      });
-      //No documents with their employee ID, not attending.
-      setState(() {
-        _isEmployeeAttendingToday = false;
       });
     } else {
       setState(() {
@@ -347,18 +354,37 @@ class _LoginState extends State<LoginScreen> with TickerProviderStateMixin{
       .reference
       .collection("days")
       .document(dateAsString)
-      .setData({"slotsLeft" : _initalSlots})
       .then((onValue) {
         _businessValue
         .reference
         .collection("days")
         .document(dateAsString)
-        .collection("attending")
+        .collection("locations")
         .document("inital")
         .setData({"placeholder":false});
       });
     }
   }
+
+  dynamic getLocationDocuments() async {
+    return await _businessValue.reference
+    .collection('days')
+    .document(getFirebaseDate(_selectedDate))
+    .collection('locations')
+    .getDocuments();
+  }
+
+  dynamic getAttendanceFromSnapshot(snapshot, index) async {
+    return await _businessValue.reference
+      .collection("days")
+      .document(getFirebaseDate(_selectedDate))
+      .collection("locations")
+      .document(snapshot.data.documents[index].documentID)
+      .collection("attendees")
+      .getDocuments();
+  }
+  
+  DateTime _selectedDate = DateTime.now();
   
   @override
   Widget build(BuildContext context) {
@@ -373,17 +399,257 @@ class _LoginState extends State<LoginScreen> with TickerProviderStateMixin{
             child: Stack(
               children: <Widget>[
                 //Background
-                Container(transform: Matrix4.translationValues(0, 0, 0), child: Background()),
+                Background(),
                 LoginUI(),
                 Container(
-                  transform: Matrix4.translationValues(0, 850, 0),
-                  margin: EdgeInsets.all(25),
-                  height: 530,
+                  transform: Matrix4.translationValues(0, 880, 0),
+                  margin: EdgeInsets.only(left: 25, right: 25),
                   width: MediaQuery.of(context).size.height,
-                  decoration: BoxDecoration(color: Colors.red),
-                  child: (
-                    Text("Shit Here")
-                  ),
+                  child: Column(
+                    children: <Widget>[
+                      Container(
+                        height: 310,
+                        child: TableCalendar(
+                          calendarController: _calendarController,
+                          onDaySelected: (DateTime date, List events) {setState(() {_selectedDate = date;});},
+                          initialCalendarFormat: CalendarFormat.month,
+                          availableCalendarFormats: const{CalendarFormat.month:""},
+                          startingDayOfWeek: StartingDayOfWeek.monday,
+                          calendarStyle: CalendarStyle(
+                            outsideDaysVisible: true,
+                            weekendStyle: TextStyle(color: Colors.grey[800]).copyWith(),
+                            weekdayStyle: TextStyle(color: Colors.grey[800]).copyWith(),
+                          ),
+                          headerStyle: HeaderStyle(
+                            headerPadding: EdgeInsets.only(top: 10, bottom: 10, left: 18),
+                            titleTextStyle: TextStyle(
+                              fontFamily: "Futura Bold",
+                              color: Colors.grey[700],
+                              fontSize: 20,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                      (_onMainDataScreen) ? Container(
+                        height: 240,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Color.fromRGBO(240, 245, 250, 0.8),
+                            borderRadius: BorderRadius.only(topLeft:  Radius.circular(35), bottomLeft: Radius.circular(25), bottomRight: Radius.circular(30)),
+                          ),
+                          child: Stack(
+                            children: <Widget>[
+                              Row(
+                                children: <Widget>[
+                                  Container(
+                                    margin: EdgeInsets.only(top: 15, left: 25),
+                                    child: Text(
+                                      "Dates",
+                                      style: TextStyle(
+                                        color: Colors.grey[500],
+                                        fontFamily: "Futura",
+                                        fontWeight: FontWeight.w800
+                                      ),
+                                    ),
+                                  ),
+                                  Container(
+                                    margin: EdgeInsets.only(top: 10, left: 20),
+                                    width: 1,
+                                    height: 30,
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey[300]
+                                    ),
+                                  ),
+                                  Container(
+                                    margin: EdgeInsets.only(top: 15, left: 20),
+                                    child: Text(
+                                      "Offices",
+                                      style: TextStyle(
+                                        color: Colors.grey[500],
+                                        fontFamily: "Futura",
+                                        fontWeight: FontWeight.w800
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Container(
+                                margin: EdgeInsets.only(top: 40, bottom: 35),
+                                child: FutureBuilder(
+                                  future: getLocationDocuments(),
+                                  builder: (context, snapshot) {
+                                    if (snapshot.data.documents.length == 0) {
+                                      return Container(
+                                        child: Center(
+                                          child: Text(
+                                            "Oops!\nNo Offices Are Open Today!",
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        )
+                                      );
+                                    }
+                                    return (snapshot.connectionState == ConnectionState.waiting) ? Container() : ScrollConfiguration(
+                                      behavior: MyBehavior(),
+                                      child: ListView.builder(
+                                        padding: EdgeInsets.only(left: 8, right: 8, bottom: 20),
+                                        reverse: false,
+                                        itemCount: snapshot.data.documents.length,
+                                        itemBuilder: (_, int index) {
+                                          return FutureBuilder(
+                                            future: getAttendanceFromSnapshot(snapshot, index),
+                                            builder: (context, employeeSnapshots) {
+                                              if (employeeSnapshots.connectionState == ConnectionState.waiting) {
+                                                return Container();
+                                              } else {
+                                                bool isEmployeeAttendingEvent = false;
+                                                for(int i = 0; i < employeeSnapshots.data.documents.length; i++) {
+                                                  if (employeeSnapshots.data.documents[i].documentID == _employeeNumber) {
+                                                    isEmployeeAttendingEvent = true;
+                                                  }
+                                                }
+                                                return Container(
+                                                  margin: EdgeInsets.only(left: 10, right: 10),
+                                                  height: 80,
+                                                  child: Stack(
+                                                    children: <Widget>[
+                                                      Container(
+                                                        alignment: Alignment(-1, 0.15),
+                                                        child: Text(
+                                                          Jiffy(_selectedDate).format("d.MM.yy"),
+                                                          style: TextStyle(
+                                                            color: Colors.grey[700],
+                                                            fontFamily: "Futura",
+                                                            fontWeight: FontWeight.w600,
+                                                            fontSize: 13,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      Align(
+                                                        alignment: Alignment(-0.59, 0),
+                                                        child: Container(
+                                                          height: 80,
+                                                          width: 1,
+                                                          color: Colors.grey[300]
+                                                        ),
+                                                      ),
+                                                      Align(
+                                                        alignment: Alignment(-0.62, 0.1),
+                                                          child: Container(
+                                                          width: 15,
+                                                          height: 15,
+                                                          decoration: BoxDecoration(
+                                                            shape: BoxShape.circle,
+                                                            gradient: LinearGradient(
+                                                              begin: Alignment.topRight,
+                                                              end: Alignment.bottomLeft,
+                                                              colors: [Colors.pink[300] , Colors.orange[200]],
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      Align(
+                                                        alignment: Alignment(1, -1),
+                                                        child: Container(
+                                                          margin: EdgeInsets.only(top: 10, left: 5, right: 5, bottom: 5),
+                                                          width: 200,
+                                                          decoration: BoxDecoration(
+                                                            borderRadius: BorderRadius.circular(10),
+                                                            color: Colors.white,
+                                                            boxShadow: [
+                                                              BoxShadow(
+                                                                blurRadius: 8,
+                                                                spreadRadius: 1,
+                                                                color: Colors.grey[300].withOpacity(0.7),
+                                                                offset: Offset(0, 3)
+                                                              )
+                                                            ]
+                                                          ),
+                                                          child: Row(
+                                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                            children: <Widget>[
+                                                              Column(
+                                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                                children: <Widget>[
+                                                                  Container(
+                                                                    margin: EdgeInsets.only(top: 15, left: 10),
+                                                                    child: Text(
+                                                                      "${snapshot.data.documents[index].documentID[0].toUpperCase()}${snapshot.data.documents[index].documentID.substring(1)}",
+                                                                      style: TextStyle(
+                                                                        fontFamily: "FuturaBold",
+                                                                        fontWeight: FontWeight.w100,
+                                                                        color: Colors.grey[700],
+                                                                        fontSize: 12,
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                  Container(
+                                                                    margin: EdgeInsets.only(top: 3, left: 10),
+                                                                    child: Row(
+                                                                      children: <Widget>[
+                                                                        Icon(
+                                                                          Icons.business,
+                                                                          size: 18,
+                                                                        ),
+                                                                        Container(
+                                                                          margin: EdgeInsets.only(top: 2, left: 5),
+                                                                          child: Text(
+                                                                            "${(snapshot.data.documents[index]["maxSlots"] - snapshot.data.documents[index]["slotsLeft"]).toString()} / ${snapshot.data.documents[index]["maxSlots"]}",
+                                                                            style: TextStyle(
+                                                                              fontFamily: "Futura",
+                                                                              fontWeight: FontWeight.w800,
+                                                                              color: Colors.grey[600],
+                                                                              fontSize: 12,
+                                                                            ),
+                                                                          ),
+                                                                        ),
+                                                                      ],
+                                                                    ),
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                              Align(
+                                                                alignment: Alignment(1, 0.3),
+                                                                child: Row(
+                                                                  children: <Widget>[
+                                                                    Container(
+                                                                      margin: EdgeInsets.only(right: 5),
+                                                                      height: 10,
+                                                                      width: 10,
+                                                                      decoration: BoxDecoration(
+                                                                        shape: BoxShape.circle,
+                                                                        color: (isEmployeeAttendingEvent && snapshot.data.documents[index]["slotsLeft"] > 0) ? Colors.green : Colors.red
+                                                                      ),
+                                                                    ),
+                                                                    Container(
+                                                                      margin: EdgeInsets.only(right: 5),
+                                                                      child: Text((isEmployeeAttendingEvent) ? "Attending" : "Not\nAttending")
+                                                                    ),
+                                                                  ],
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                );
+                                              }
+                                            }
+                                          );
+                                        }
+                                      ),
+                                    );
+                                  }
+                                )
+                              ),
+                            ]
+                          ),
+                        ),
+                      ) : Container(),
+                    ],
+                  )
                 ),
               ],
             ),
@@ -403,20 +669,20 @@ class _LoginState extends State<LoginScreen> with TickerProviderStateMixin{
             width: 400,
             margin: EdgeInsets.only(top: 630, left: 25, right: 25),
             child: CustomPaint(
-              painter: DesignedByPainter(),
+              painter: MainInfoPainter(),
               child: Stack(
                 children: <Widget>[
                   (_logoURL != null && _enterEmployeeNumberData) ? Align(
-                    alignment: Alignment(-1, -0.1 + _companyLogoMarginAnimation.value),
+                    alignment: Alignment(-1, -0.4 + _companyLogoMarginAnimation.value),
                     child: Container(
                       margin: EdgeInsets.only(left: 15),
-                      height: 60,
-                      width: 80,
+                      height: 100,
+                      width: 100,
                       child: Image.network(_logoURL)
                     ),
                   ) : Container(),
                   (_onMainDataScreen) ? Align(
-                    alignment: Alignment(-0.85, _companyLogoMarginAnimation.value * 1.4),
+                    alignment: Alignment(-0.85, _companyLogoMarginAnimation.value * 1.1),
                     child: Container(
                       child: Text(
                         Jiffy(_date).format("EEEE, do MMMM").toUpperCase(),
@@ -430,7 +696,7 @@ class _LoginState extends State<LoginScreen> with TickerProviderStateMixin{
                     ),
                   ) : Container(),
                   Align(
-                    alignment: Alignment(-1, 0.25 + (_companyLogoMarginAnimation.value * 1.3)),
+                    alignment: Alignment(-1, 0.25 + (_companyLogoMarginAnimation.value * 1)),
                     child: Container(
                       margin: EdgeInsets.only(left: 15),
                       child: Row(
@@ -463,7 +729,7 @@ class _LoginState extends State<LoginScreen> with TickerProviderStateMixin{
                     builder: (context, child) => Opacity(
                       opacity: _upButtonOpacityAnimation.value,
                       child: Align(
-                        alignment: Alignment(1.09, 1.04),
+                        alignment: Alignment(1.15, 0.85),
                         child: MaterialButton(
                           color: Colors.pink[400].withOpacity(0.75),
                           shape: CircleBorder(),
@@ -474,9 +740,52 @@ class _LoginState extends State<LoginScreen> with TickerProviderStateMixin{
                             setState(() {
                               _loginWidgetTranslationController.reverse();
                               _companyLogoMarginController.reverse();
+                              _upButtonOpacityController.reverse();
+                              _backButtonOpacityController.forward();
                               _onMainDataScreen = false;
                             });
                           }),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Container(
+                    margin: EdgeInsets.only(top: 90),
+                    height: 250,
+                    child: AnimatedBuilder(
+                      animation: _upButtonOpacityAnimation,
+                      builder: (context, child) => Opacity(
+                        opacity: _upButtonOpacityAnimation.value,
+                        child: Column(
+                          children: <Widget>[
+                            Container(
+                              margin: EdgeInsets.only(top: 100, left: 15, right: 55),
+                              height: 1,
+                              decoration: BoxDecoration(
+                                color: Colors.grey[300]
+                              ),
+                            ),
+                            Container(
+                              alignment: Alignment(-1, 0),
+                              margin: EdgeInsets.only(top: 8, left: 15, bottom: 5),
+                              child: (_isEmployeeAttendingToday != null && _employeeAttendingTodayLocation != null) ? Text(
+                                "You Are ${(_isEmployeeAttendingToday) ? "" : "Not"} Going Into The ${_employeeAttendingTodayLocation[0].toUpperCase() + _employeeAttendingTodayLocation.substring(1)} Office Today.",
+                                style: TextStyle(
+                                  color: (_isEmployeeAttendingToday) ? Color.fromRGBO(247, 185, 123, 1) : Color.fromRGBO(255, 114, 140, 1),
+                                  fontFamily: "Futura",
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                ),
+                              ) : Container(),
+                            ),
+                            Container(
+                              margin: EdgeInsets.only(left: 15, right: 55),
+                              height: 1,
+                              decoration: BoxDecoration(
+                                color: Colors.grey[300]
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -676,11 +985,16 @@ class _LoginState extends State<LoginScreen> with TickerProviderStateMixin{
   @override
   void dispose() {
     _textFieldController.dispose();
+    _calendarController.dispose();
+    _textFieldColorController.dispose();
     _backButtonOpacityController.dispose();
     _businessIDTitleColorController.dispose();
     _businessIDTranslationController.dispose();
     _employeeNumberTitleColorController.dispose();
     _employeeNumberTranslationController.dispose();
+    _loginWidgetTranslationController.dispose();
+    _companyLogoMarginController.dispose();
+    _upButtonOpacityController.dispose();
     super.dispose();
   }
 }
@@ -858,15 +1172,15 @@ class LoginContainerPainter extends CustomPainter {
       ..color = Colors.white;
 
     final topLeftCircleBounds = Rect.fromCircle(center: Offset(30, 30), radius: 30);
-    final bottomLeftCircleBounds = Rect.fromCircle(center: Offset(30, 450), radius: 30);
+    final bottomLeftCircleBounds = Rect.fromCircle(center: Offset(30, 470), radius: 30);
     final bottomRightCircleBounds = Rect.fromCircle(center: Offset(size.width - 30, size.height - 30), radius: 30);
     final topRightCircleBounds = Rect.fromCircle(center: Offset(size.width - 30, 30), radius: 30);
 
     Path path = Path()
     ..moveTo(30, 0)
     ..arcTo(topLeftCircleBounds, -pi / 2, -pi / 2, false)
-    ..lineTo(0, 450)
-    ..arcTo(bottomLeftCircleBounds, pi, -pi / 2.5, false)
+    ..lineTo(0, 470)
+    ..arcTo(bottomLeftCircleBounds, pi, -pi / 4, false)
     ..lineTo(size.width - 40, size.height - 1)
     ..arcTo(bottomRightCircleBounds, pi / 1.5, -pi / 1.5, false)
     ..lineTo(size.width, 30)
@@ -881,7 +1195,7 @@ class LoginContainerPainter extends CustomPainter {
   bool shouldRepaint(CustomPainter oldDelegate) => false;
 }
 
-class DesignedByPainter extends CustomPainter {
+class MainInfoPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final Paint paint = new Paint()
@@ -891,7 +1205,7 @@ class DesignedByPainter extends CustomPainter {
       ..color = Colors.grey.withAlpha(210)
       ..maskFilter = MaskFilter.blur(BlurStyle.normal, 10);
 
-    final topCircleBounds = Rect.fromCircle(center: Offset(23, 30), radius: 23);
+    final topCircleBounds = Rect.fromCircle(center: Offset(23, 10), radius: 23);
     final bottomLeftCircleBounds = Rect.fromCircle(center: Offset(30, size.height * 3.5), radius: 30);
     final bottomRightCircleBounds = Rect.fromCircle(center: Offset(size.width - 30, size.height * 3.5), radius: 30);
     final topLeftCircleBounds = Rect.fromCircle(center: Offset(size.width - 30, size.height * 0.85), radius: 30);
@@ -905,7 +1219,7 @@ class DesignedByPainter extends CustomPainter {
     ..arcTo(bottomRightCircleBounds, pi / 2, -pi / 2 , false)
     ..lineTo(size.width, size.height * 0.85)
     ..arcTo(topLeftCircleBounds, 0, -pi / 3.5, false)
-    ..lineTo(30, 7)
+    ..lineTo(32, -11)
     ..close();
 
     Path shadowPath = Path()
@@ -926,4 +1240,9 @@ class DesignedByPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(CustomPainter oldDelegate) => false;
+}
+
+class MyBehavior extends ScrollBehavior {
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) => ClampingScrollPhysics();
 }
